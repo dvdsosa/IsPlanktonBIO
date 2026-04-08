@@ -1,0 +1,30 @@
+paths:
+  dataset_root_path: 'data/raw_files/test_set/'
+  faiss_index_stage_1: 'data/databases/vector/faiss_index_stage1_pruned_089.bin'
+  faiss_index_stage_2: 'data/databases/vector/faiss_index_stage2_opencv_pruned_091.bin'
+  sqlite_db_stage_1: 'data/databases/sql/plankton_db_stage1_pruned_089.sqlite'
+  sqlite_db_stage_2: 'data/databases/sql/plankton_db_stage2_opencv_pruned_091.sqlite'
+  ckpt_stage_1: 'data/models/weights/resnet50_stage1.pth'
+  ckpt_stage_2: 'data/models/weights/resnet50_stage2_opencv.pth'
+  areas_json: 'output/species_results_areas.json'
+  species_json: 'output/inference_results.json'
+  plots_save_path: 'output/plots_pipeline_test/'
+  plots_save_failed: 'output/plots_pipeline_test_failed/'
+  mask_save_path: 'output/opencv_test_masks_yes/'
+  mask_save_failed: 'output/opencv_test_masks_no/'
+  log_json_path: 'output/log_v3.json'
+  lehette_params: 'data/databases/lehette_parameters.json'
+
+model:
+  name: 'resnet50timm'
+
+transforms:
+  stage1:
+    mean: [0.0418, 0.0353, 0.0409]
+    std: [0.0956, 0.0911, 0.0769]
+  stage2:
+    mean: [0.0425, 0.0436, 0.0432]
+    std: [0.1466, 0.1488, 0.1476]
+
+# Pixel length for DYB-PlanktonNet is 7.38 μm. Area per pixel in mm^2 = (7.38 * 10^-3)^2
+pixel_to_mm2: 0.0000544644

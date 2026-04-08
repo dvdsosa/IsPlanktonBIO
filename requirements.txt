@@ -1,0 +1,19 @@
+# Computer Vision & Deep Learning Core
+torch==2.5.1
+torchvision==0.20.1
+torcheval==0.0.7
+timm==1.0.15
+opencv-python>=4.10.0
+
+# Vector Search (Embeddings)
+faiss-cpu==1.11.0
+
+# Data Processing & Plotting
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
+matplotlib>=3.9.0
+
+# Utilities
+PyYAML>=6.0.0
+tqdm>=4.66.0

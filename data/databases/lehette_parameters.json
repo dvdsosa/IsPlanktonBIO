@@ -1,0 +1,350 @@
+{
+    "009_Penilia avirostris": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "010_Evadne tergestina": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "011_Acartia sp.A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "012_Acartia sp.B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "013_Acartia sp.C": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "014_Calanopia sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "015_Labidocera sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "016_Tortanus gracilis": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "017_Calanoid with egg": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "019_Calanoid_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "020_Calanoid_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "022_Calanoid_Type D": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "024_Oithona sp.B with egg": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "025_Cyclopoid_Type A_with egg": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "026_Cyclopoid_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "027_Harpacticoid_mating": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "029_Microsetella sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "030_Monstrilla sp.A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "031_Monstrilla sp.B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "033_Caligus sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "034_Copepod_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "035_Caprella sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "036_Amphipoda_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "037_Amphipoda_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "038_Amphipoda_Type C": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "039_Gammarids_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "040_Gammarids_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "041_Gammarids_Type C": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "042_Cymodoce sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "043_Lucifer sp": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "044_Macrura larvae": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "045_Megalopa larva_Phase 1_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "046_Megalopa larva_Phase 1_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "047_Megalopa larva_Phase 1_Type C": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "048_Megalopa larva_Phase 1_Type D": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "049_Megalopa larva_Phase 2": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "050_Porcrellanidae larva": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "051_Shrimp-like larva_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "052_Shrimp-like larva_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "053_Shrimp-like_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "054_Shrimp-like_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "055_Shrimp-like_Type C": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "056_Shrimp-like_Type D": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "057_Shrimp-like_Type E": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "058_Shrimp-like_Type F": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "059_Ostracoda": {
+        "a": 99.46,
+        "b": 1.28,
+        "b_se": 0.19,
+        "group": "crustacean"
+    },
+    "060_Cumacea_Type A": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "061_Cumacea_Type B": {
+        "a": 43.97,
+        "b": 1.52,
+        "b_se": 0.02,
+        "group": "crustacean"
+    },
+    "062_Chaetognatha": {
+        "a": 23.45,
+        "b": 1.19,
+        "b_se": 0.13,
+        "group": "gelatinous"
+    },
+    "063_Oikopleura sp. parts": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "064_Oikopleura sp": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "065_Tunicata_Type A": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "066_Actiniaria larva": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "067_Hydroid": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "068_Jellyfish": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "069_Jelly-like": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "072_Gelatinous Zooplankton": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    },
+    "082_Noctiluca scintillans": {
+        "a": 4.03,
+        "b": 1.24,
+        "b_se": 0.08,
+        "group": "gelatinous"
+    }
+}

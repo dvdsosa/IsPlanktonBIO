@@ -1,0 +1,9 @@
+*.jpg
+*.png
+# Python cache files
+__pycache__/
+*.py[cod]
+
+*.pth
+*.bin
+*.sqlite

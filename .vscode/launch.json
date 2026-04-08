@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug src.main",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.main",
+            "python": "/home/dsosatr/ofa/myenvOFA/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

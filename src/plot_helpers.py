@@ -36,6 +36,7 @@ class PlotPaths:
     PLOTS_SAVE_PATH_FAILED: str
     MASK_SAVE_PATH: str
     MASK_SAVE_PATH_FAILED: str
+    SAVE_PLOT_FIGURES: bool = True
 
 
 def plot_pipeline_steps(plot_data: "PlotData", plot_paths: "PlotPaths"):
@@ -71,6 +72,9 @@ def plot_pipeline_steps(plot_data: "PlotData", plot_paths: "PlotPaths"):
     # Extract class_id and image_id and save area
     class_id, image_id = get_subtitles(path)
     save_mask_area(class_id, image_id, mask_area_mm2, AREAS_JSON_PATH)
+
+    if not plot_paths.SAVE_PLOT_FIGURES and not ENABLE_PLOT_DISPLAY:
+        return
 
     # Create a figure with three subplots using fixed width ratios so the center mask
     # panel remains narrower and the cropped image has more space. Reserve extra
@@ -207,34 +211,35 @@ def plot_pipeline_steps(plot_data: "PlotData", plot_paths: "PlotPaths"):
     plt.tight_layout(rect=(0, 0.15, 1, 0.92))
 
     # Build filenames and save paths
-    base_image_id, _ = os.path.splitext(image_id)
-    if pipeline_result:
-        save_dir = os.path.join(PLOTS_SAVE_PATH, class_id)
-        os.makedirs(save_dir, exist_ok=True)
-        save_file_path = os.path.join(save_dir, f"{base_image_id}.png")
+    if plot_paths.SAVE_PLOT_FIGURES:
+        base_image_id, _ = os.path.splitext(image_id)
+        if pipeline_result:
+            save_dir = os.path.join(PLOTS_SAVE_PATH, class_id)
+            os.makedirs(save_dir, exist_ok=True)
+            save_file_path = os.path.join(save_dir, f"{base_image_id}.png")
 
-        mask_save_dir = os.path.join(MASK_SAVE_PATH, class_id)
-        os.makedirs(mask_save_dir, exist_ok=True)
-        mask_save_file_path = os.path.join(mask_save_dir, f"{base_image_id}.jpg")
-    else:
-        save_failed_dir = os.path.join(PLOTS_SAVE_PATH_FAILED, class_id)
-        os.makedirs(save_failed_dir, exist_ok=True)
-        save_file_path = os.path.join(save_failed_dir, f"{base_image_id}.png")
+            mask_save_dir = os.path.join(MASK_SAVE_PATH, class_id)
+            os.makedirs(mask_save_dir, exist_ok=True)
+            mask_save_file_path = os.path.join(mask_save_dir, f"{base_image_id}.jpg")
+        else:
+            save_failed_dir = os.path.join(PLOTS_SAVE_PATH_FAILED, class_id)
+            os.makedirs(save_failed_dir, exist_ok=True)
+            save_file_path = os.path.join(save_failed_dir, f"{base_image_id}.png")
 
-        mask_save_dir = os.path.join(MASK_SAVE_PATH_FAILED, class_id)
-        os.makedirs(mask_save_dir, exist_ok=True)
-        mask_save_file_path = os.path.join(mask_save_dir, f"{base_image_id}.jpg")
+            mask_save_dir = os.path.join(MASK_SAVE_PATH_FAILED, class_id)
+            os.makedirs(mask_save_dir, exist_ok=True)
+            mask_save_file_path = os.path.join(mask_save_dir, f"{base_image_id}.jpg")
 
-    plt.savefig(save_file_path)
-    print_green(f"Saved plot to {save_file_path}")
+        plt.savefig(save_file_path)
+        print_green(f"Saved plot to {save_file_path}")
 
-    # Convert cropped to RGB for saving (cv2.imwrite expects BGR but original was BGR; to keep appearance consistent convert to RGB)
-    try:
-        cropped_rgb = cv2.cvtColor(cropped_bgr, cv2.COLOR_BGR2RGB)
-    except Exception:
-        cropped_rgb = cropped_bgr
-    cv2.imwrite(mask_save_file_path, cropped_rgb)
-    print_green(f"Saved cropped mask image to {mask_save_file_path}")
+        # Convert cropped to RGB for saving (cv2.imwrite expects BGR but original was BGR; to keep appearance consistent convert to RGB)
+        try:
+            cropped_rgb = cv2.cvtColor(cropped_bgr, cv2.COLOR_BGR2RGB)
+        except Exception:
+            cropped_rgb = cropped_bgr
+        cv2.imwrite(mask_save_file_path, cropped_rgb)
+        print_green(f"Saved cropped mask image to {mask_save_file_path}")
 
     if ENABLE_PLOT_DISPLAY:
         plt.show(block=True)

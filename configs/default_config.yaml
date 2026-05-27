@@ -1,5 +1,5 @@
 paths:
-  dataset_root_path: 'data/raw_files/test_set/'
+  dataset_root_path: '/dev/shm/test_dataset_ram/'
   faiss_index_stage_1: 'data/databases/vector/faiss_index_stage1_pruned_089.bin'
   faiss_index_stage_2: 'data/databases/vector/faiss_index_stage2_opencv_pruned_091.bin'
   sqlite_db_stage_1: 'data/databases/sql/plankton_db_stage1_pruned_089.sqlite'
@@ -28,3 +28,6 @@ transforms:
 
 # Pixel length for DYB-PlanktonNet is 7.38 μm. Area per pixel in mm^2 = (7.38 * 10^-3)^2
 pixel_to_mm2: 0.0000544644
+
+runtime:
+  save_plot_figures: false

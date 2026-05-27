@@ -288,6 +288,7 @@ def process_single_image(
         PLOTS_SAVE_PATH_FAILED=config["paths"]["plots_save_failed"],
         MASK_SAVE_PATH=config["paths"]["mask_save_path"],
         MASK_SAVE_PATH_FAILED=config["paths"]["mask_save_failed"],
+        SAVE_PLOT_FIGURES=config.get("runtime", {}).get("save_plot_figures", True),
     )
     plot_pipeline_steps(plot_data, plot_paths)
 

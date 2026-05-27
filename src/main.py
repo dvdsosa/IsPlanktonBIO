@@ -21,8 +21,10 @@ import argparse
 import json
 import logging
 import os
+import queue
 import sqlite3
 import sys
+import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -69,6 +71,12 @@ from src.logger_utils import (
 )
 from src.models_utils import load_faiss_index, load_model
 from src.pipeline_context import PipelineContext
+from src.pipeline_worker import (
+    data_feed_worker,
+    inference_worker,
+    output_worker,
+    preprocess_worker,
+)
 from src.plot_helpers import (
     PlotData,
     PlotPaths,
@@ -92,6 +100,16 @@ def parse_args():
         type=str,
         default="configs/default_config.yaml",
         help="Path to the configuration YAML file.",
+    )
+    parser.add_argument(
+        "--threaded",
+        action="store_true",
+        default=False,
+        help=(
+            "Run the 4-stage threaded pipeline (T1→T2→T3→T4) instead of the "
+            "default sequential loop.  Overlaps CPU preprocessing (T2), GPU "
+            "inference (T3), and file I/O (T4) for higher throughput."
+        ),
     )
     return parser.parse_args()
 
@@ -350,22 +368,73 @@ def main():
         config=config,
         biomass_params=biomass_params,
         pixel_to_mm2_factor=pixel_to_mm2,
+        # Paths for T4 to open its own SQLite connections (cursors are not thread-safe)
+        sqlite_db_path_stage1=SQLITE_DB_PATH_STAGE_1,
+        sqlite_db_path_stage2=SQLITE_DB_PATH_STAGE_2,
     )
 
     start_time = time.time()  # Start timing
 
-    with torch.no_grad():
-        for (stage1_image, ground_truth, path), (stage2_image, _, _) in tqdm(
-            zip(loader_with_paths(stage1_loader), loader_with_paths(stage2_loader)),
-            desc="Processing",
-        ):
-            process_single_image(
-                stage1_image,
-                ground_truth,
-                path,
-                stage2_image,
-                context,
-            )
+    if args.threaded:
+        # ------------------------------------------------------------------
+        # 4-stage threaded pipeline: T1→T2→T3→T4
+        # Overlaps DataLoader iteration (T1), CPU preprocessing (T2), GPU
+        # inference + FAISS search (T3), and DB/JSON/plot I/O (T4).
+        # Activate with: python -m src.main --threaded
+        # ------------------------------------------------------------------
+        raw_queue = queue.Queue(maxsize=20)
+        preproc_queue = queue.Queue(maxsize=4)
+        infer_queue = queue.Queue(maxsize=4)
+        bar = tqdm(total=len(stage1_loader.dataset), desc="Processing [threaded]")
+
+        threads = [
+            threading.Thread(
+                target=data_feed_worker,
+                args=(stage1_loader, stage2_loader, raw_queue),
+                name="T1-DataFeed",
+                daemon=True,
+            ),
+            threading.Thread(
+                target=preprocess_worker,
+                args=(raw_queue, preproc_queue, config.get("transforms")),
+                name="T2-Preprocess",
+                daemon=True,
+            ),
+            threading.Thread(
+                target=inference_worker,
+                args=(preproc_queue, infer_queue, context),
+                name="T3-Inference",
+                daemon=True,
+            ),
+            threading.Thread(
+                target=output_worker,
+                args=(infer_queue, context, bar),
+                name="T4-Output",
+                daemon=True,
+            ),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        bar.close()
+    else:
+        # ------------------------------------------------------------------
+        # Original sequential path (default) — preserved for reference and
+        # as a correctness baseline for --threaded verification.
+        # ------------------------------------------------------------------
+        with torch.no_grad():
+            for (stage1_image, ground_truth, path), (stage2_image, _, _) in tqdm(
+                zip(loader_with_paths(stage1_loader), loader_with_paths(stage2_loader)),
+                desc="Processing",
+            ):
+                process_single_image(
+                    stage1_image,
+                    ground_truth,
+                    path,
+                    stage2_image,
+                    context,
+                )
 
     sql_stage1.close()
     sql_stage2.close()

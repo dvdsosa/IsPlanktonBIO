@@ -22,6 +22,8 @@ cd IsPlanktonBIO
 To set up the environment and install all necessary dependencies for deep learning inference (`torch`, `torchvision`), vector embeddings (`faiss-cpu`), and data processing, run:
 
 ```bash
+conda create -n paper2 python=3.12.3 -y
+conda activate paper2
 pip install -r requirements.txt
 ```
 

@@ -28,7 +28,6 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-import cv2
 import faiss
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,7 +55,7 @@ from src.image_utils import (
     otsu_normal,
     preprocess_image,
 )
-from src.io_utils import get_subtitles, save_mask_area, save_species_info
+from src.io_utils import accumulate_result, dump_results_json, get_subtitles
 from src.logger_utils import (
     ENABLE_PLOT_DISPLAY,
     ENABLE_PRINTING,
@@ -111,6 +110,18 @@ def parse_args():
             "inference (T3), and file I/O (T4) for higher throughput."
         ),
     )
+    parser.add_argument(
+        "--compile",
+        action="store_true",
+        default=False,
+        help=(
+            "Apply torch.compile() to both encoder models before inference. "
+            "Requires PyTorch >= 2.0.  Uses mode='reduce-overhead', which "
+            "minimises Python-dispatcher overhead per call — the dominant cost "
+            "at batch_size=1.  Expect a slow first 1-2 images while the "
+            "TorchInductor kernels are traced and cached."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -148,6 +159,8 @@ def process_single_image(
     config = context.config
     biomass_params = context.biomass_params
     pixel_to_mm2 = context.pixel_to_mm2_factor
+    threshold_stage1 = context.cosine_threshold_stage1
+    threshold_stage2 = context.cosine_threshold_stage2
 
     print_normal(f"Processing image: {path}.")
     stage1_image = stage1_image.float().cuda()
@@ -157,41 +170,74 @@ def process_single_image(
     D_stage1, I_stage1 = faiss_index_stage1.search(feature_stage1_np, 1)
     faiss_id_stage1 = int(I_stage1[0][0])
     result_query_stage1 = get_label_from_db(sql_cursor_stage1, faiss_id_stage1)
+    confidence_score_stage1 = float(D_stage1[0][0])
+
     result_query_stage2 = None
+    confidence_score_stage2 = None
+    mask_contour = None
+    # 0.0 (not None) so the plotting / area-saving step never multiplies None
+    # when Stage-1 is OOD-rejected before segmentation runs (matches the
+    # threaded path, where T2 also defaults mask_area to 0.0).
+    mask_area = 0.0
+    acceptable_segmentation = False
+    biomass_val = None
+
+    _, image_id = get_subtitles(path)
 
     print_green(
-        f"Real image class: {ground_truth} - Queried image class: {result_query_stage1}"
+        f"Real image class: {ground_truth} - Queried image class: {result_query_stage1} "
+        f"(similarity_s1={confidence_score_stage1:.4f})"
     )
 
-    # Convert from PyTorch tensor to numpy array for STAGE-2 processing
+    # Convert from PyTorch tensor to numpy array for STAGE-2 processing and
+    # plotting. Done unconditionally (even when Stage-1 is OOD-rejected) so the
+    # plotting block always receives a numpy image.
+    # Undo ToTensor() by multiplying by 255 — NORM_MINMAX is FORBIDDEN here,
+    # since it would rescale each image's dynamic range and corrupt the
+    # brightness-dependent segmentation.
     stage2_image = stage2_image.squeeze(0).numpy()
     stage2_image = np.transpose(stage2_image, (1, 2, 0))
-    # Normalize to [0, 255] uint8 range from float32
-    stage2_image = cv2.normalize(
-        stage2_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-    )
+    stage2_image = (stage2_image * 255.0).clip(0, 255).astype(np.uint8)
 
-    # Preprocess the image
-    preprocessed_image = preprocess_image(stage2_image)
-    success, mask_area, mask_contour = get_area_proxy_method(
-        stage2_image, preprocessed_image
-    )
-    acceptable_segmentation = False
+    # ------------------------------------------------------------------
+    # Stage-1 OOD gate: reject when the nearest-neighbour cosine similarity
+    # falls below the calibrated threshold. Unlike the previous behaviour,
+    # the ground truth is NOT used to gate the pipeline — it only serves as
+    # the JSON grouping key and for logging/plotting.
+    # ------------------------------------------------------------------
+    if confidence_score_stage1 < threshold_stage1:
+        print_log_red(
+            f"Stage-1 rejected by cosine threshold (similarity={confidence_score_stage1:.4f} "
+            f"< {threshold_stage1}): {path}"
+        )
+        is_valid = "ood_sample_stage1"
+    else:
+        # Preprocess the image
+        preprocessed_image = preprocess_image(stage2_image)
+        success, mask_area, mask_contour = get_area_proxy_method(
+            stage2_image, preprocessed_image
+        )
 
-    class_id, image_id = get_subtitles(path)
-
-    if result_query_stage1 == ground_truth:
-        if success and mask_contour is not None:
+        if not (success and mask_contour is not None):
+            print_log_red(f"Failed segmentation: {path}")
+            is_valid = "failed-segmentation"
+        else:
             acceptable_segmentation = is_border_touch_acceptable(
                 mask_contour, tolerance_percent=10.0
             )
-            if acceptable_segmentation:
+            if not acceptable_segmentation:
+                print_log_yellow(f"The specimen touches border: {path}")
+                is_valid = "touches-border"
+            else:
                 cropped_image = crop_image_with_mask(stage2_image, mask_contour)
                 cropped_image = apply_additional_transforms_stage2(
                     cropped_image, config.get("transforms")
                 )
 
-                if cropped_image is not None and cropped_image.numel() > 0:
+                if cropped_image is None or cropped_image.numel() == 0:
+                    print_log_yellow(f"Failed cropping: {path}")
+                    is_valid = "failed-cropping"
+                else:
                     transformed_img = cropped_image.unsqueeze(0).to(stage1_image.device)
                     features_stage2 = model_stage2.encoder(transformed_img)
                     features_stage2 = torch.nn.functional.normalize(
@@ -203,12 +249,21 @@ def process_single_image(
                     result_query_stage2 = get_label_from_db(
                         sql_cursor_stage2, faiss_id_stage2
                     )
+                    confidence_score_stage2 = float(D_stage2[0][0])
 
                     print_green(
-                        f"Real image class: {ground_truth} - OpenCV image class: {result_query_stage2}"
+                        f"Real image class: {ground_truth} - OpenCV image class: "
+                        f"{result_query_stage2} (similarity_s2={confidence_score_stage2:.4f})"
                     )
 
-                    if result_query_stage2 == result_query_stage1:
+                    # Stage-2 OOD gate + Stage-1/Stage-2 agreement check
+                    if confidence_score_stage2 < threshold_stage2:
+                        print_log_yellow(
+                            f"Stage-2 rejected by cosine threshold "
+                            f"(similarity={confidence_score_stage2:.4f} < {threshold_stage2}): {path}"
+                        )
+                        is_valid = "ood_sample_stage2"
+                    elif result_query_stage2 == result_query_stage1:
                         is_valid = "matched"
 
                         # --- BIOMASS COMPUTATION ---
@@ -230,63 +285,20 @@ def process_single_image(
                                 f"No biomass parameters found in JSON for {result_query_stage2}"
                             )
                         # ----------------------------------------
-
                     else:
                         is_valid = "unmatched"
-                        biomass_val = None
 
-                    save_species_info(
-                        class_id,
-                        image_id,
-                        config["paths"]["species_json"],
-                        is_valid,
-                        result_query_stage2,
-                        biomass_val,
-                    )
-                else:
-                    print_log_yellow(f"Failed cropping: {path}")
-                    is_valid = "failed-cropping"
-                    save_species_info(
-                        class_id,
-                        image_id,
-                        config["paths"]["species_json"],
-                        is_valid,
-                        "none",
-                        None,
-                    )
-            else:
-                print_log_yellow(f"The specimen touches border: {path}")
-                is_valid = "touches-border"
-                save_species_info(
-                    class_id,
-                    image_id,
-                    config["paths"]["species_json"],
-                    is_valid,
-                    result_query_stage1,
-                    None,
-                )
-        else:
-            print_log_red(f"Failed segmentation: {path}")
-            is_valid = "failed-segmentation"
-            save_species_info(
-                class_id,
-                image_id,
-                config["paths"]["species_json"],
-                is_valid,
-                "none",
-                None,
-            )
-    else:
-        print_log_red(f"Stage-1 CNN prediction does not match ground truth: {path}")
-        is_valid = "unmatched-stage1"
-        save_species_info(
-            class_id,
-            image_id,
-            config["paths"]["species_json"],
-            is_valid,
-            result_query_stage1,
-            None,
-        )
+    accumulate_result(
+        context.results_dict,
+        ground_truth,
+        image_id,
+        result_query_stage1,
+        confidence_score_stage1,
+        result_query_stage2,
+        confidence_score_stage2,
+        is_valid,
+        biomass_mg=biomass_val,
+    )
 
     plot_data = PlotData(
         stage2_image=stage2_image,
@@ -325,6 +337,12 @@ def main():
     # Global pipeline parameters
     pixel_to_mm2 = config.get("pixel_to_mm2", 0.0000544644)
 
+    # FAISS cosine-similarity thresholds for OOD rejection. A sample is rejected
+    # when its nearest-neighbour cosine similarity falls below the threshold.
+    # A very negative default (-9999.0) disables the gate (never rejects).
+    cosine_threshold_stage1 = float(config.get("cosine_threshold_stage_1", -9999.0))
+    cosine_threshold_stage2 = float(config.get("cosine_threshold_stage_2", -9999.0))
+
     FAISS_INDEX_PATH_STAGE_1 = config["paths"]["faiss_index_stage_1"]
     FAISS_INDEX_PATH_STAGE_2 = config["paths"]["faiss_index_stage_2"]
     SQLITE_DB_PATH_STAGE_1 = config["paths"]["sqlite_db_stage_1"]
@@ -350,6 +368,41 @@ def main():
     model_stage1.eval()
     model_stage2.eval()
 
+    # ------------------------------------------------------------------
+    # Optional torch.compile — activate with --compile or
+    # runtime.compile_models: true in the YAML config.
+    #
+    # We compile model.encoder (not the top-level wrapper) because all
+    # inference calls go through model.encoder(image).  Compiling only
+    # the wrapper's forward() would leave the encoder path unoptimised.
+    #
+    # mode="reduce-overhead" is best for batch_size=1: it traces a CUDA
+    # graph so each forward skips Python-level dispatch entirely.
+    # Trade-off: the first ~2 images are slow while Inductor traces and
+    # caches the kernels.  Every subsequent call is significantly faster.
+    #
+    # Bonus: enable TF32 for free throughput on Ampere/Ada/Hopper GPUs
+    # (no accuracy loss for float32 convolutions in practice).
+    # ------------------------------------------------------------------
+    use_compile = args.compile or config.get("runtime", {}).get("compile_models", False)
+    if use_compile:
+        if hasattr(torch, "compile"):
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            print("=> Applying torch.compile(mode='reduce-overhead') to both encoders...")
+            model_stage1.encoder = torch.compile(
+                model_stage1.encoder, mode="reduce-overhead"
+            )
+            model_stage2.encoder = torch.compile(
+                model_stage2.encoder, mode="reduce-overhead"
+            )
+            print("   Encoders compiled. First 1-2 images will be slow (kernel tracing).")
+        else:
+            print(
+                "WARNING: --compile requested but torch.compile is unavailable "
+                "(requires PyTorch >= 2.0). Continuing without compilation."
+            )
+
     # Load biomass parameters
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     lehette_path = os.path.join(
@@ -371,6 +424,8 @@ def main():
         # Paths for T4 to open its own SQLite connections (cursors are not thread-safe)
         sqlite_db_path_stage1=SQLITE_DB_PATH_STAGE_1,
         sqlite_db_path_stage2=SQLITE_DB_PATH_STAGE_2,
+        cosine_threshold_stage1=cosine_threshold_stage1,
+        cosine_threshold_stage2=cosine_threshold_stage2,
     )
 
     start_time = time.time()  # Start timing
@@ -439,6 +494,9 @@ def main():
     sql_stage1.close()
     sql_stage2.close()
     end_time = time.time()  # End timing
+
+    # Write the fully accumulated inference results in a single I/O operation.
+    dump_results_json(context.results_dict, config["paths"]["species_json"])
 
     print(f"Total number of images in test set: {len(stage1_loader.dataset)}")
     print(f"Total elapsed time: {end_time - start_time:.2f} seconds")

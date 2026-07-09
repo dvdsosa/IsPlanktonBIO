@@ -37,7 +37,6 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
-import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -52,7 +51,7 @@ from src.image_utils import (
     is_border_touch_acceptable,
     preprocess_image,
 )
-from src.io_utils import get_subtitles, save_species_info
+from src.io_utils import accumulate_result, get_subtitles
 from src.logger_utils import (
     print_green,
     print_log_red,
@@ -216,14 +215,14 @@ def _preprocess_one(
 ) -> None:
     """Runs the CPU preprocessing pipeline for a single image and enqueues result."""
     # ------------------------------------------------------------------
-    # Convert stage-2 PyTorch tensor → uint8 BGR numpy for OpenCV
-    # (mirrors main.py lines 149-154)
+    # Convert stage-2 PyTorch tensor → uint8 numpy for OpenCV.
+    # Undo ToTensor() by multiplying by 255 — NORM_MINMAX is FORBIDDEN here,
+    # since it would rescale each image's dynamic range and corrupt the
+    # brightness-dependent segmentation (mirrors process_single_image in main.py).
     # ------------------------------------------------------------------
     stage2_np = item.stage2_image.squeeze(0).numpy()
     stage2_np = np.transpose(stage2_np, (1, 2, 0))
-    stage2_bgr: np.ndarray = cv2.normalize(
-        stage2_np, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-    )
+    stage2_bgr: np.ndarray = (stage2_np * 255.0).clip(0, 255).astype(np.uint8)
 
     # ------------------------------------------------------------------
     # OpenCV preprocessing: grayscale → brightness/contrast → Otsu
@@ -438,6 +437,8 @@ def _output_one(
     config = context.config
     biomass_params = context.biomass_params
     pixel_to_mm2 = context.pixel_to_mm2_factor
+    threshold_stage1 = context.cosine_threshold_stage1
+    threshold_stage2 = context.cosine_threshold_stage2
 
     print_normal(f"Processing image: {item.path}.")
 
@@ -445,106 +446,90 @@ def _output_one(
     # Stage-1 DB lookup
     # ------------------------------------------------------------------
     result_query_stage1 = get_label_from_db(cursor_s1, item.faiss_id_stage1)
+    confidence_score_stage1 = item.dist_stage1
     result_query_stage2: Optional[str] = None
+    confidence_score_stage2 = item.dist_stage2
     is_valid = "unmatched"
     biomass_val = None
 
+    _, image_id = get_subtitles(item.path)
+
     print_green(
-        f"Real image class: {item.ground_truth} - Queried image class: {result_query_stage1}"
+        f"Real image class: {item.ground_truth} - Queried image class: {result_query_stage1} "
+        f"(similarity_s1={confidence_score_stage1:.4f})"
     )
 
-    class_id, image_id = get_subtitles(item.path)
+    # ------------------------------------------------------------------
+    # Stage-1 OOD gate: reject on low cosine similarity. The ground truth is
+    # NOT used to gate the pipeline — only as the JSON grouping key and for
+    # logging/plotting. Note that T3 may have run Stage-2 speculatively; when
+    # Stage-1 is rejected here, that speculative result is simply discarded.
+    # ------------------------------------------------------------------
+    if confidence_score_stage1 < threshold_stage1:
+        print_log_red(
+            f"Stage-1 rejected by cosine threshold (similarity={confidence_score_stage1:.4f} "
+            f"< {threshold_stage1}): {item.path}"
+        )
+        is_valid = "ood_sample_stage1"
+        confidence_score_stage2 = None
+    elif not (item.success and item.mask_contour is not None):
+        print_log_red(f"Failed segmentation: {item.path}")
+        is_valid = "failed-segmentation"
+        confidence_score_stage2 = None
+    elif not item.acceptable_segmentation:
+        print_log_yellow(f"The specimen touches border: {item.path}")
+        is_valid = "touches-border"
+        confidence_score_stage2 = None
+    elif item.faiss_id_stage2 is None:
+        # T3 skipped Stage-2 (cropped_tensor was None despite acceptable seg.)
+        print_log_yellow(f"Failed cropping: {item.path}")
+        is_valid = "failed-cropping"
+        confidence_score_stage2 = None
+    else:
+        result_query_stage2 = get_label_from_db(cursor_s2, item.faiss_id_stage2)
 
-    if result_query_stage1 == item.ground_truth:
-        # Stage-1 matched ground truth
-        if item.success and item.mask_contour is not None:
-            if item.acceptable_segmentation:
-                # Stage-2 inference was run speculatively in T3; check result
-                if item.faiss_id_stage2 is not None:
-                    result_query_stage2 = get_label_from_db(cursor_s2, item.faiss_id_stage2)
+        print_green(
+            f"Real image class: {item.ground_truth} - OpenCV image class: "
+            f"{result_query_stage2} (similarity_s2={confidence_score_stage2:.4f})"
+        )
 
-                    print_green(
-                        f"Real image class: {item.ground_truth} - "
-                        f"OpenCV image class: {result_query_stage2}"
-                    )
+        if confidence_score_stage2 < threshold_stage2:
+            print_log_yellow(
+                f"Stage-2 rejected by cosine threshold "
+                f"(similarity={confidence_score_stage2:.4f} < {threshold_stage2}): {item.path}"
+            )
+            is_valid = "ood_sample_stage2"
+        elif result_query_stage2 == result_query_stage1:
+            is_valid = "matched"
 
-                    if result_query_stage2 == result_query_stage1:
-                        is_valid = "matched"
-
-                        biomass_val = compute_biomass(
-                            species_label=result_query_stage2,
-                            area_pixels=item.mask_area,
-                            biomass_params=biomass_params,
-                            pixel_to_mm2_factor=pixel_to_mm2,
-                        )
-                        if biomass_val is not None:
-                            print_green(
-                                f"Estimated Biomass for {result_query_stage2}: "
-                                f"{biomass_val:.4f} mg"
-                            )
-                        else:
-                            print_log_yellow(
-                                f"No biomass parameters found in JSON for "
-                                f"{result_query_stage2}"
-                            )
-                    else:
-                        is_valid = "unmatched"
-
-                    save_species_info(
-                        class_id,
-                        image_id,
-                        config["paths"]["species_json"],
-                        is_valid,
-                        result_query_stage2,
-                        biomass_val,
-                    )
-                else:
-                    # T3 skipped Stage-2 (cropped_tensor was None despite acceptable seg.)
-                    print_log_yellow(f"Failed cropping: {item.path}")
-                    is_valid = "failed-cropping"
-                    save_species_info(
-                        class_id,
-                        image_id,
-                        config["paths"]["species_json"],
-                        is_valid,
-                        "none",
-                        None,
-                    )
+            biomass_val = compute_biomass(
+                species_label=result_query_stage2,
+                area_pixels=item.mask_area,
+                biomass_params=biomass_params,
+                pixel_to_mm2_factor=pixel_to_mm2,
+            )
+            if biomass_val is not None:
+                print_green(
+                    f"Estimated Biomass for {result_query_stage2}: {biomass_val:.4f} mg"
+                )
             else:
-                print_log_yellow(f"The specimen touches border: {item.path}")
-                is_valid = "touches-border"
-                save_species_info(
-                    class_id,
-                    image_id,
-                    config["paths"]["species_json"],
-                    is_valid,
-                    result_query_stage1,
-                    None,
+                print_log_yellow(
+                    f"No biomass parameters found in JSON for {result_query_stage2}"
                 )
         else:
-            print_log_red(f"Failed segmentation: {item.path}")
-            is_valid = "failed-segmentation"
-            save_species_info(
-                class_id,
-                image_id,
-                config["paths"]["species_json"],
-                is_valid,
-                "none",
-                None,
-            )
-    else:
-        print_log_red(
-            f"Stage-1 CNN prediction does not match ground truth: {item.path}"
-        )
-        is_valid = "unmatched-stage1"
-        save_species_info(
-            class_id,
-            image_id,
-            config["paths"]["species_json"],
-            is_valid,
-            result_query_stage1,
-            None,
-        )
+            is_valid = "unmatched"
+
+    accumulate_result(
+        context.results_dict,
+        item.ground_truth,
+        image_id,
+        result_query_stage1,
+        confidence_score_stage1,
+        result_query_stage2,
+        confidence_score_stage2,
+        is_valid,
+        biomass_mg=biomass_val,
+    )
 
     # ------------------------------------------------------------------
     # Plotting

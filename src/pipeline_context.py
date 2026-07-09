@@ -1,6 +1,6 @@
 import sqlite3
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import torch
 
@@ -22,3 +22,11 @@ class PipelineContext:
     # (sqlite3 cursors are not thread-safe; T4 creates new connections from these paths)
     sqlite_db_path_stage1: str = field(default="")
     sqlite_db_path_stage2: str = field(default="")
+    # FAISS cosine-similarity thresholds for OOD rejection. A sample is rejected
+    # when its nearest-neighbour cosine similarity falls BELOW the threshold.
+    # A very negative value (e.g. -9999.0) disables the gate (never rejects).
+    cosine_threshold_stage1: float = field(default=-9999.0)
+    cosine_threshold_stage2: float = field(default=-9999.0)
+    # In-memory accumulator for inference results. Written once at the end of the
+    # run via io_utils.dump_results_json; keyed by ground_truth class name.
+    results_dict: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)

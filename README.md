@@ -9,6 +9,42 @@ This repository contains the official codebase for the manuscript submitted to t
 **IsPlanktonBIO** implements a comprehensive computer vision pipeline combining Supervised Contrastive Learning (SupCon) embeddings with classical image processing techniques. The execution is twofold:
 1. **Stage-1 (Taxonomy):** Integrates the [IsPlanktonIR](https://doi.org/10.1093/icesjms/fsac198) Information Retrieval system, utilizing a FAISS index for high-accuracy initial species classification.
 2. **Stage-2 (Morphology & Verification):** Employs automated OpenCV-based segmentation to isolate specimens, calculates planar area for biomass estimation, and cross-verifies the initial prediction using secondary morphological embeddings.
+
+### How the pipeline decides (per image)
+
+The FAISS indices use Inner Product over L2-normalised embeddings, so each nearest-neighbour search returns a **cosine similarity** in `[-1, 1]` (higher = more similar). The pipeline does **not** use the ground-truth label to decide anything; the ground truth is only recorded as the grouping key in the output and used for logging. Each image flows through the following gates:
+
+1. **Stage-1 OOD gate** — if the Stage-1 cosine similarity is **below** `cosine_threshold_stage_1`, the image is rejected as `ood_sample_stage1`.
+2. **Segmentation** — if OpenCV cannot isolate a specimen contour → `failed-segmentation`.
+3. **Border check** — if the specimen touches the image border beyond tolerance → `touches-border`.
+4. **Cropping** — if the masked crop is empty → `failed-cropping`.
+5. **Stage-2 OOD gate** — if the Stage-2 cosine similarity is **below** `cosine_threshold_stage_2`, the image is rejected as `ood_sample_stage2`.
+6. **Agreement** — if Stage-1 and Stage-2 predictions agree → `matched` (and biomass is computed); otherwise → `unmatched`.
+
+> **OOD thresholds.** A sample is rejected when its similarity falls *below* the threshold. A very negative value (the shipped default `-9999.0`) **disables** the gate, so nothing is ever rejected and every image proceeds to segmentation. Replace `cosine_threshold_stage_1` / `cosine_threshold_stage_2` in the config with values calibrated on an In-Distribution validation set to enable OOD rejection.
+
+### Output format (`output/inference_results.json`)
+
+Results are accumulated in memory and written once at the end of the run. The JSON is keyed by **ground-truth class name**; each image is one entry that keeps both stage predictions, their similarities, the final pipeline status, and the estimated biomass:
+
+```json
+{
+    "Copepoda": [
+        {
+            "filename": "img_00123.jpg",
+            "stage_1_prediction": "Copepoda",
+            "stage_1_confidence": 0.8421,
+            "stage_2_prediction": "Copepoda",
+            "stage_2_confidence": 0.7965,
+            "pipeline_status": "matched",
+            "biomass_mg": 0.004512
+        }
+    ]
+}
+```
+
+`stage_2_*` and `biomass_mg` are `null` when the image did not reach the corresponding step.
+
 ---
 
 ## ⚙️ Installation & Requirements
@@ -49,10 +85,24 @@ Please download the following files from Zenodo and place them in their respecti
 
 ## 🚀 Usage (Running the Full Pipeline)
 
-Once the environment and the dataset are ready (see the *"Dataset Access"* section below), you can launch the complete two-stage inference and morphological extraction pipeline by running:
+Once the environment and the dataset are ready (see the *"Dataset Access"* section below), you can launch the complete two-stage inference and morphological extraction pipeline.
+
+**Load the test set into RAM first.** The embedded Kria target loads the dataset from a RAM-backed filesystem, so for a fair, apples-to-apples timing comparison we run the desktop pipeline the same way. Copy the test set into `/dev/shm` (tmpfs) — this matches the `dataset_root_path` in `configs/default_config.yaml`:
+
+```bash
+cp -r /home/dsosatr/tesis/DYB-VOS/test /dev/shm/test_dataset_ram
+```
+
+Then run the pipeline:
 
 ```bash
 python -m src.main --config configs/default_config.yaml
+```
+
+When you are done, erase the dataset from RAM to free the tmpfs space:
+
+```bash
+rm -rf /dev/shm/test_dataset_ram
 ```
 
 The pipeline will read the configurations, load models and FAISS indices, evaluate the test set, calculate biomass, and output the tracking results and telemetry.
@@ -66,10 +116,16 @@ If you wish to verify the metrics reported in the paper (Accuracy, F1-Score, etc
 You can generate the final tables and comprehensive classification reports instantly by running:
 
 ```bash
-python -m src.evaluate_metrics
+python -m tests.evaluate_metrics --json_path output/inference_results.json
 ```
 
-This script reads the true labels and model predictions from the JSON file and calculates all the exact figures presented in the manuscript.
+This script reads the true labels and both stage predictions from the JSON file and reports three views of performance:
+
+- **Pipeline Acceptance / Rejection Analysis** — the fraction of images accepted (`matched`), rejected as OOD at each stage, rejected for touching the border, or left `unmatched` (Stage-1 ≠ Stage-2).
+- **Global Classifier Cascade (End-to-End)** — accuracy/precision/recall/F1 using the best available prediction (Stage-2 when present, else Stage-1).
+- **Stage Metrics** — the raw classifier accuracy of each backbone, without OOD gating.
+
+A copy of the printed report is also written to `tests/output/<method>_acc.txt` (the path is auto-derived from the JSON filename, or set explicitly with `--output`).
 
 ---
 

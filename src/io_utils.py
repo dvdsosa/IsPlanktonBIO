@@ -65,64 +65,72 @@ def save_mask_area(
     print_normal(f"Saved mask area {int(mask_area)} for {class_id}/{image_id}")
 
 
-def save_species_info(
-    class_id, image_id, json_path, is_valid, result_inference, biomass_val=None
-):
+def accumulate_result(
+    results_dict: dict,
+    ground_truth: str,
+    filename: str,
+    stage_1_prediction,
+    stage_1_confidence,
+    stage_2_prediction,
+    stage_2_confidence,
+    pipeline_status: str,
+    biomass_mg=None,
+) -> None:
     """
-    Logs species classification inferences to a structured JSON file mapping pipeline statuses.
+    Appends one inference entry to the in-memory results dict.
+
+    The parent key is always ``ground_truth`` (class name); the pipeline status
+    is stored inside each entry instead of grouping the top-level dict by status.
+    This keeps both the Stage-1 and Stage-2 predictions (with their confidences)
+    for every image and avoids the status-based grouping that leaked information
+    into downstream evaluation. Results are collected in memory and written once
+    at the end of the run via :func:`dump_results_json`.
 
     Args:
-        class_id (str): The ground-truth class directory name.
-        image_id (str): The processed image filename.
-        json_path (str): System path for the output JSON serialization.
-        is_valid (str): The categorical status constraint (e.g., 'matched', 'touches-border').
-        result_inference (str): The final predicted class label string.
+        results_dict: Mapping of ground_truth -> list[entry_dict] accumulated in place.
+        ground_truth: True class label (used as parent key).
+        filename: Image filename.
+        stage_1_prediction: Predicted class from Stage 1 (None if not available).
+        stage_1_confidence: Stage-1 FAISS cosine similarity (None if not available).
+        stage_2_prediction: Predicted class from Stage 2 (None if Stage 2 did not run).
+        stage_2_confidence: Stage-2 FAISS cosine similarity (None if Stage 2 did not run).
+        pipeline_status: Final pipeline outcome ('matched', 'unmatched',
+            'ood_sample_stage1', 'ood_sample_stage2', 'failed-segmentation',
+            'touches-border', 'failed-cropping', ...).
+        biomass_mg: Estimated biomass in mg (None if not computed).
     """
-    # Create the directory if it doesn't exist
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-
-    # Load existing data if the file exists
-    if os.path.isfile(json_path):
-        try:
-            with open(json_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-        except json.JSONDecodeError:
-            data = {
-                "matched": {},
-                "unmatched": {},
-                "failed-cropping": {},
-                "touches-border": {},
-                "failed-segmentation": {},
-                "unmatched-stage1": {},
-            }
-    else:
-        data = {
-            "matched": {},
-            "unmatched": {},
-            "failed-cropping": {},
-            "touches-border": {},
-            "failed-segmentation": {},
-            "unmatched-stage1": {},
-        }
-
-    if class_id not in data[is_valid]:
-        data[is_valid][class_id] = []
-
-    # Create entry with file, predicted, and status information
     entry = {
-        "file": image_id,
-        "predicted": result_inference if result_inference != "none" else None,
+        "filename": filename,
+        "stage_1_prediction": stage_1_prediction,
+        "stage_1_confidence": round(float(stage_1_confidence), 6)
+        if stage_1_confidence is not None
+        else None,
+        "stage_2_prediction": stage_2_prediction,
+        "stage_2_confidence": round(float(stage_2_confidence), 6)
+        if stage_2_confidence is not None
+        else None,
+        "pipeline_status": pipeline_status,
+        "biomass_mg": round(float(biomass_mg), 6) if biomass_mg is not None else None,
     }
-    if biomass_val is not None:
-        # Format the biomass nicely
-        entry["biomass"] = round(biomass_val, 6)
 
-    # Add entry to the list if not already present (check by filename)
-    if not any(item.get("file") == image_id for item in data[is_valid][class_id]):
-        data[is_valid][class_id].append(entry)
+    bucket = results_dict.setdefault(ground_truth, [])
+    if not any(item["filename"] == filename for item in bucket):
+        bucket.append(entry)
 
-    # Save the updated data back to the file
-    with open(json_path, "w", encoding="utf-8") as file:
-        json.dump(data, file, indent=4)
 
-    print_normal(f"Saved species info for {class_id}/{image_id} as {is_valid}")
+def dump_results_json(results_dict: dict, json_path: str) -> None:
+    """
+    Writes a fully accumulated inference-results dict to disk in one I/O operation.
+
+    Designed to be called once after the full inference loop instead of writing
+    after every image, eliminating the per-image read-modify-write bottleneck.
+
+    Args:
+        results_dict: Mapping of ground_truth -> list[entry_dict].
+        json_path: Destination file path (created if absent).
+    """
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    with open(json_path, "w", encoding="utf-8") as fh:
+        json.dump(results_dict, fh, indent=4)
+    total = sum(len(v) for v in results_dict.values())
+    print_normal(f"Saved {total} inference results -> {json_path}")

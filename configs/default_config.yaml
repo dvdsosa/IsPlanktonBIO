@@ -29,5 +29,17 @@ transforms:
 # Pixel length for DYB-PlanktonNet is 7.38 μm. Area per pixel in mm^2 = (7.38 * 10^-3)^2
 pixel_to_mm2: 0.0000544644
 
+# FAISS cosine-similarity thresholds for OOD (Out-Of-Distribution) rejection.
+# The FAISS indices use Inner Product on L2-normalised embeddings, so the search
+# score is a cosine similarity in [-1, 1] (higher = more similar). A sample is
+# REJECTED when its nearest-neighbour similarity falls BELOW the threshold.
+# The pipeline no longer uses the ground truth to gate Stage-1; this OOD gate
+# replaces it. A very negative value disables the gate (nothing is ever rejected).
+# Replace with calibrated values (e.g. from an In-Distribution validation set)
+# to enable OOD rejection.
+cosine_threshold_stage_1: -9999.0
+cosine_threshold_stage_2: -9999.0
+
 runtime:
   save_plot_figures: false
+  compile_models: true

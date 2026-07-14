@@ -328,6 +328,14 @@ def main():
     Reads configurations, instantiates directories, initializes dataloaders, databases,
     and hardware models, iterates through the test suite, and computes operational runtimes.
     """
+    # Suppress verbose logging from external libraries to keep tqdm progress bar visible
+    logging.getLogger("sam2").setLevel(logging.WARNING)
+    logging.getLogger("torch").setLevel(logging.WARNING)
+    logging.getLogger("torchvision").setLevel(logging.WARNING)
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    # Suppress root logger INFO messages from any library
+    logging.getLogger().setLevel(logging.WARNING)
+
     args = parse_args()
 
     with open(args.config, "r") as f:

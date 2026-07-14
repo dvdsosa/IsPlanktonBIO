@@ -1,11 +1,14 @@
 paths:
-  dataset_root_path: '/dev/shm/test_dataset_ram/'
+  dataset_root_path: '/home/dsosatr/tesis/DYB-linearHead/test'
   faiss_index_stage_1: 'data/databases/vector/faiss_index_stage1_pruned_089.bin'
-  faiss_index_stage_2: 'data/databases/vector/faiss_index_stage2_opencv_pruned_091.bin'
+  faiss_index_stage_2_opencv: 'data/databases/vector/faiss_index_stage2_opencv_pruned_091.bin'
+  faiss_index_stage_2_sam2: 'data/databases/vector/faiss_index_stage2_pruned_093.bin'
   sqlite_db_stage_1: 'data/databases/sql/plankton_db_stage1_pruned_089.sqlite'
-  sqlite_db_stage_2: 'data/databases/sql/plankton_db_stage2_opencv_pruned_091.sqlite'
+  sqlite_db_stage_2_opencv: 'data/databases/sql/plankton_db_stage2_opencv_pruned_091.sqlite'
+  sqlite_db_stage_2_sam2: 'data/databases/sql/plankton_db_stage2_pruned_093.sqlite'
   ckpt_stage_1: 'data/models/weights/resnet50_stage1.pth'
-  ckpt_stage_2: 'data/models/weights/resnet50_stage2_opencv.pth'
+  ckpt_stage_2_opencv: 'data/models/weights/resnet50_stage2_opencv.pth'
+  ckpt_stage_2_sam2: 'data/models/weights/resnet50_stage2_sam2.pth'
   areas_json: 'output/species_results_areas.json'
   species_json: 'output/inference_results.json'
   plots_save_path: 'output/plots_pipeline_test/'
@@ -17,6 +20,27 @@ paths:
 
 model:
   name: 'resnet50timm'
+
+# Stage-2 segmentation backend used to isolate the specimen and measure its area.
+#   method: 'opencv' -> default heuristic (Otsu + morphology). No extra deps.
+#   method: 'sam2'   -> Segment Anything Model 2 (Meta). Optional dependency:
+#                       install with `pip install -r requirements-sam2.txt` and
+#                       download the checkpoint (see README, "Optional: SAM2
+#                       segmentation"). The sam2 package is imported lazily, so
+#                       the 'opencv' path never requires it.
+segmentation:
+  method: 'opencv'
+  sam2:
+    # Hydra config name bundled inside the installed `sam2` package.
+    model_cfg: 'configs/sam2.1/sam2.1_hiera_l.yaml'
+    # Local path to the SAM2 checkpoint (.pt). Excluded from git; download from
+    # the project's Zenodo record. See README for the exact link.
+    checkpoint: 'data/models/weights/sam2/sam2.1_hiera_large.pt'
+    # Prompt-point strategy: 'mesh' (grid of interior points) or 'center'
+    # (single deepest interior point). 'mesh' is more robust for thin appendages.
+    prompt_method: 'mesh'
+    # Target number of grid points when prompt_method is 'mesh'.
+    points_density: 500
 
 transforms:
   stage1:

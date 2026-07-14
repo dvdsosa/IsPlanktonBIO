@@ -8,9 +8,12 @@ The execution is divided into two main components:
     1. Stage-1 (Taxonomy): An Information Retrieval (IR) system utilizing a FAISS
        index for highly accurate, initial species classification.
     2. Stage-2 (Morphology & Verification): An automated segmentation protocol
-       using OpenCV heuristics to isolate specimens, extract their planar area in mm²
-       (as a preparatory step for downstream biomass estimation), and perform a
-       secondary embedding verification on the cropped region.
+       to isolate specimens, extract their planar area in mm² (as a preparatory
+       step for downstream biomass estimation), and perform a secondary embedding
+       verification on the cropped region. The segmentation backend is pluggable
+       and selected via the 'segmentation.method' config field: 'opencv' (default
+       heuristic — Otsu + morphology) or 'sam2' (Segment Anything Model 2, an
+       optional GPU-backed dependency). See src/segmenters.py.
 
 Configuration is handled via a YAML file (e.g., 'configs/default_config.yaml').
 Please refer to the README.md file at the repository root for detailed execution
@@ -50,10 +53,8 @@ from src.image_utils import (
     adjust_brightness_contrast_cv,
     convert_area_pixels_to_mm2,
     crop_image_with_mask,
-    get_area_proxy_method,
     is_border_touch_acceptable,
     otsu_normal,
-    preprocess_image,
 )
 from src.io_utils import accumulate_result, dump_results_json, get_subtitles
 from src.logger_utils import (
@@ -70,6 +71,7 @@ from src.logger_utils import (
 )
 from src.models_utils import load_faiss_index, load_model
 from src.pipeline_context import PipelineContext
+from src.segmenters import build_segmenter
 from src.pipeline_worker import (
     data_feed_worker,
     inference_worker,
@@ -212,11 +214,8 @@ def process_single_image(
         )
         is_valid = "ood_sample_stage1"
     else:
-        # Preprocess the image
-        preprocessed_image = preprocess_image(stage2_image)
-        success, mask_area, mask_contour = get_area_proxy_method(
-            stage2_image, preprocessed_image
-        )
+        # Segment the specimen using the configured backend (OpenCV or SAM2).
+        success, mask_area, mask_contour = context.segmenter.segment(stage2_image)
 
         if not (success and mask_contour is not None):
             print_log_red(f"Failed segmentation: {path}")
@@ -343,12 +342,23 @@ def main():
     cosine_threshold_stage1 = float(config.get("cosine_threshold_stage_1", -9999.0))
     cosine_threshold_stage2 = float(config.get("cosine_threshold_stage_2", -9999.0))
 
+    # Determine segmentation method to select appropriate stage-2 checkpoints
+    segmentation_method = config.get("segmentation", {}).get("method", "opencv")
+
     FAISS_INDEX_PATH_STAGE_1 = config["paths"]["faiss_index_stage_1"]
-    FAISS_INDEX_PATH_STAGE_2 = config["paths"]["faiss_index_stage_2"]
     SQLITE_DB_PATH_STAGE_1 = config["paths"]["sqlite_db_stage_1"]
-    SQLITE_DB_PATH_STAGE_2 = config["paths"]["sqlite_db_stage_2"]
     CKPT_PATH_STAGE_1 = config["paths"]["ckpt_stage_1"]
-    CKPT_PATH_STAGE_2 = config["paths"]["ckpt_stage_2"]
+
+    # Select stage-2 paths based on segmentation method
+    if segmentation_method == "sam2":
+        FAISS_INDEX_PATH_STAGE_2 = config["paths"]["faiss_index_stage_2_sam2"]
+        SQLITE_DB_PATH_STAGE_2 = config["paths"]["sqlite_db_stage_2_sam2"]
+        CKPT_PATH_STAGE_2 = config["paths"]["ckpt_stage_2_sam2"]
+    else:  # opencv (default)
+        FAISS_INDEX_PATH_STAGE_2 = config["paths"]["faiss_index_stage_2_opencv"]
+        SQLITE_DB_PATH_STAGE_2 = config["paths"]["sqlite_db_stage_2_opencv"]
+        CKPT_PATH_STAGE_2 = config["paths"]["ckpt_stage_2_opencv"]
+
     MODEL_NAME = config["model"]["name"]
 
     faiss_index_stage1 = load_faiss_index(FAISS_INDEX_PATH_STAGE_1)
@@ -359,6 +369,11 @@ def main():
     sql_cursor_stage2 = sql_stage2.cursor()
     model_stage1 = load_model(CKPT_PATH_STAGE_1, MODEL_NAME)
     model_stage2 = load_model(CKPT_PATH_STAGE_2, MODEL_NAME)
+
+    # Build the Stage-2 segmentation backend (OpenCV by default, SAM2 optional).
+    # SAM2 is imported lazily inside its constructor, so the OpenCV path never
+    # requires the optional 'sam2' dependency.
+    segmenter = build_segmenter(config)
 
     stage1_loader, stage2_loader = set_loader(
         dataset_root_path=config["paths"]["dataset_root_path"],
@@ -426,6 +441,7 @@ def main():
         sqlite_db_path_stage2=SQLITE_DB_PATH_STAGE_2,
         cosine_threshold_stage1=cosine_threshold_stage1,
         cosine_threshold_stage2=cosine_threshold_stage2,
+        segmenter=segmenter,
     )
 
     start_time = time.time()  # Start timing
@@ -451,7 +467,12 @@ def main():
             ),
             threading.Thread(
                 target=preprocess_worker,
-                args=(raw_queue, preproc_queue, config.get("transforms")),
+                args=(
+                    raw_queue,
+                    preproc_queue,
+                    config.get("transforms"),
+                    context.segmenter,
+                ),
                 name="T2-Preprocess",
                 daemon=True,
             ),

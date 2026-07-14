@@ -74,6 +74,7 @@ Please download the following files from Zenodo and place them in their respecti
 - **`data/models/weights/`**
   - `resnet50_stage1.pth`
   - `resnet50_stage2_opencv.pth`
+  - `sam2/sam2.1_hiera_large.pt` *(only needed for the optional SAM2 backend; see "Optional: SAM2 Segmentation Backend" below)*
 - **`data/databases/vector/`**
   - `faiss_index_stage1_pruned_089.bin`
   - `faiss_index_stage2_opencv_pruned_091.bin`
@@ -106,6 +107,71 @@ rm -rf /dev/shm/test_dataset_ram
 ```
 
 The pipeline will read the configurations, load models and FAISS indices, evaluate the test set, calculate biomass, and output the tracking results and telemetry.
+
+---
+
+## 🧩 Optional: SAM2 Segmentation Backend
+
+The Stage-2 morphology step supports two interchangeable segmentation backends,
+selected by the `segmentation.method` field in `configs/default_config.yaml`:
+
+- **`opencv`** (default): a dependency-free heuristic (Otsu threshold +
+  morphology + connected components). This is what the paper reports and
+  requires nothing beyond `requirements.txt`.
+- **`sam2`**: [Segment Anything Model 2](https://github.com/facebookresearch/sam2)
+  (Meta), automatically prompted with foreground points derived from the same
+  preprocessing. It produces higher-quality masks at the cost of a heavy
+  optional dependency and GPU weights.
+
+SAM2 is imported lazily, so **you do not need to install anything extra to run
+the default OpenCV backend.** To enable SAM2:
+
+1. Install the optional dependency (requires a CUDA-capable GPU):
+
+   ```bash
+   pip install --no-build-isolation -r requirements-sam2.txt
+   ```
+
+   > **Note:** The `--no-build-isolation` flag is required to bypass SAM2's 
+   > package name mismatch issue during build.
+
+2. Download the checkpoint into `data/models/weights/sam2/`:
+
+   ```bash
+   bash scripts/download_sam2.sh
+   ```
+
+3. Set the backend in your config:
+
+   ```yaml
+   segmentation:
+     method: 'sam2'
+   ```
+
+Then run the pipeline as usual (`python -m src.main --config configs/default_config.yaml`).
+Both backends are compatible with the `--threaded` execution mode.
+
+### SAM2 Installation Troubleshooting
+
+SAM2 from GitHub has a package name mismatch during build (`sam-2` in metadata vs 
+`sam2` in requirements). The `--no-build-isolation` flag bypasses this:
+
+```bash
+pip install --no-build-isolation -r requirements-sam2.txt
+```
+
+**If that still fails**, try installing the package directly:
+```bash
+pip install --no-build-isolation git+https://github.com/facebookresearch/sam2.git@main
+```
+
+After successful installation, verify it works:
+```bash
+python -c "from sam2.build_sam import build_sam2; print('SAM2 imported successfully')"
+```
+
+If you continue to experience issues, consider using the default **OpenCV backend** 
+(`segmentation.method: 'opencv'`) instead, which requires no extra dependencies.
 
 ---
 
@@ -159,5 +225,87 @@ paths:
   dataset_root_path: '/path/to/your/repository/data/raw_files/test_set/'
 ```
 *Note: The `train_files.csv` and `val_files.csv` are also provided in the `data/splits/` folder for complete transparency and in case you wish to retrain the models from scratch.*
+
+---
+
+## ⏱️ Benchmarking (FPS & Power/Energy on a desktop GPU)
+
+Two helper scripts benchmark the pipeline on a CUDA desktop and report, as
+**mean ± std** over N repetitions: **FPS**, peak process RAM, GPU power/memory/utilization,
+CPU utilization/temperature, CPU package power (via RAPL), and **energy per inference**
+(J/image) for GPU, CPU, and total.
+
+- **`benchmark_gpu.sh <backend> [runs]`** — benchmarks a single backend
+  (`opencv` or `sam2`). Requires the test set already loaded in RAM.
+- **`run_all_gpu.sh [runs]`** — sweeps **both** backends sequentially; it loads
+  the test set into `/dev/shm` automatically and removes it afterwards.
+
+Outputs land in `output/metrics/metrics_gpu_<backend>.txt` plus the renamed
+`output/inference_results_gpu_<backend>.json` and `output/species_results_gpu_<backend>.json`.
+
+### When do I need `sudo`?
+
+The **only** measurement that requires elevated privileges is **CPU package power/energy**,
+read from the kernel RAPL counter (`/sys/class/powercap/intel-rapl:0/energy_uj`), which is
+root-only on recent kernels. Everything else (FPS, GPU power/memory, CPU utilization/temperature,
+RAM) is captured without `sudo`.
+
+| Goal | Command |
+|------|---------|
+| Everything **except** CPU power | run **without** `sudo` |
+| **Also** CPU power/energy (RAPL) | run **with** `sudo -E` |
+
+Running under `sudo -E` preserves your environment; the script hands the generated files
+back to your user (`$SUDO_USER`) when it finishes.
+
+### Copy-paste ready
+
+Activate your environment first (the script auto-activates `paper2` only if `torch` is missing):
+
+```bash
+conda activate paper2
+```
+
+**Both backends, no CPU power** (loads/frees the RAM dataset automatically):
+
+```bash
+bash run_all_gpu.sh 10
+```
+
+**Both backends, WITH CPU power/energy** (RAPL → needs `sudo`):
+
+```bash
+sudo -E bash run_all_gpu.sh 10
+```
+
+**Single backend** (`benchmark_gpu.sh` does *not* manage the RAM dataset, so load it first):
+
+```bash
+# 1) Load the test set into RAM (matches dataset_root_path in the config)
+cp -r /home/dsosatr/tesis/DYB-VOS/test /dev/shm/test_dataset_ram
+
+# 2a) OpenCV backend — without CPU power
+bash benchmark_gpu.sh opencv 10
+# 2b) OpenCV backend — with CPU power (RAPL)
+sudo -E bash benchmark_gpu.sh opencv 10
+
+# 2c) SAM2 backend — without CPU power
+bash benchmark_gpu.sh sam2 10
+# 2d) SAM2 backend — with CPU power (RAPL)
+sudo -E bash benchmark_gpu.sh sam2 10
+
+# 3) Free the RAM when done
+rm -rf /dev/shm/test_dataset_ram
+```
+
+The second argument (`10` above) is the number of repetitions; it defaults to `10` if omitted.
+
+> **Notes.**
+> - The `sam2` backend needs the optional dependency and checkpoint from the
+>   *"Optional: SAM2 Segmentation Backend"* section above.
+> - A single-instance lock prevents two benchmarks from running at once (they
+>   share the same `output/*.json` files); wait for one to finish before starting another.
+> - If a run fails, its `output/metrics/run_<backend>_<n>.log` is kept with the
+>   error; on success the per-run log is removed.
 
 ---

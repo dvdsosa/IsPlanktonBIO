@@ -1,0 +1,16 @@
+# Optional dependencies for the SAM2 (Segment Anything Model 2) segmentation
+# backend (segmentation.method: sam2 in the config).
+#
+# The core pipeline (segmentation.method: opencv) does NOT require any of these.
+# Install only if you want to use SAM2:
+#
+#     pip install --no-build-isolation -r requirements-sam2.txt
+#
+# Then download the checkpoint (see README, "Optional: SAM2 segmentation").
+#
+# NOTE: SAM2 requires torch >= 2.5 (already pinned in requirements.txt).
+#
+# Installation note: SAM2 from GitHub has a package name mismatch (sam-2 vs sam2)
+# during build. The --no-build-isolation flag bypasses this issue.
+
+git+https://github.com/facebookresearch/sam2.git@main

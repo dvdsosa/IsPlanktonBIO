@@ -71,7 +71,7 @@ def set_loader(dataset_root_path: str, transform_cfg: dict = None) -> Tuple[Any,
     )
     stage1_dataset = CustomDataset(root=dataset_root_path, transform=stage1_transform)
     stage1_loader = torch.utils.data.DataLoader(
-        stage1_dataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True
+        stage1_dataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=False
     )
 
     stage2_transform = transforms.Compose(
@@ -81,7 +81,7 @@ def set_loader(dataset_root_path: str, transform_cfg: dict = None) -> Tuple[Any,
     )
     stage2_dataset = CustomDataset(root=dataset_root_path, transform=stage2_transform)
     stage2_loader = torch.utils.data.DataLoader(
-        stage2_dataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True
+        stage2_dataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=False
     )
 
     return stage1_loader, stage2_loader

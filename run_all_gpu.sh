@@ -53,8 +53,27 @@ if [ ! -d "$RAM_DIR" ]; then
     fi
 fi
 
-cleanup() { [ "$created_ram" = 1 ] && { echo "Freeing RAM dataset: $RAM_DIR"; rm -rf "$RAM_DIR"; }; }
+cleanup() {
+    [ "$created_ram" = 1 ] && { echo "Freeing RAM dataset: $RAM_DIR"; rm -rf "$RAM_DIR"; }
+}
+
+cleanup_on_interrupt() {
+    echo ""
+    echo "=========================================="
+    echo "Interrupt detected — killing subprocesses"
+    echo "=========================================="
+    # Kill benchmark_gpu.sh and any python processes it spawned
+    pkill -P $$ 2>/dev/null || true
+    # Also kill any lingering python processes from the pipeline
+    pkill -f "python -m src.main" 2>/dev/null || true
+    # Clean up lock files
+    rm -f "$SCRIPT_DIR/output/.benchmark_gpu.lock" /tmp/.benchmark_gpu.lock 2>/dev/null || true
+    cleanup
+    exit 130  # standard exit code for SIGINT
+}
+
 trap cleanup EXIT
+trap cleanup_on_interrupt INT TERM
 
 # ----------------------------------------------------------------------------
 # Run each backend

@@ -326,3 +326,43 @@ The second argument (`10` above) is the number of repetitions; it defaults to `1
 >   error; on success the per-run log is removed.
 
 ---
+
+## 🛰️ Edge Deployment Code (AMD Kria KV260)
+
+The paper's edge numbers (0.337 J/inference, 19.33 FPS, 6.52 W) come from a
+separate C++ implementation that runs on the board under Vitis AI, archived
+verbatim (entry-point source renamed only) under [`kria/`](kria/):
+
+```
+kria/
+├── ASSETS.md                                    # where each config-referenced file actually comes from
+├── FAISS.md                                     # building FAISS/OpenBLAS on the board (prerequisite)
+├── resnet50_cosine_faiss_turbojpeg_IVFPQ.cpp    # 4-stage threaded pipeline
+├── configs/default_config_paper2.yaml
+├── .vscode/tasks.json                           # build task — see FAISS.md first
+├── models/*.xmodel                              # DPU-compiled Stage-1/Stage-2 backbones
+├── monitor_power.sh
+├── run_paper2_experiments.sh                    # → output/metrics/metrics_paper2.txt
+└── run_paper2_idle_experiments.sh               # → output/metrics/metrics_paper2_idle.txt (source of the paper's 4.41 W idle figure)
+```
+
+Build FAISS/OpenBLAS first ([`kria/FAISS.md`](kria/FAISS.md)), then compile
+with the only task in `.vscode/tasks.json`, using
+`resnet50_cosine_faiss_turbojpeg_IVFPQ.cpp` as the active file. Fetch the
+FAISS/SQLite/weight files the config points to from
+[`kria/ASSETS.md`](kria/ASSETS.md).
+
+```bash
+cp -r ../DYB-linearHead/test /dev/shm/test_dataset_ram
+./bin/resnet50_cosine_faiss_turbojpeg_IVFPQ --config configs/default_config_paper2.yaml
+```
+
+For the paper's benchmark table (mean ± std over 10 runs):
+`./run_paper2_experiments.sh 10` (active inference) and
+`./run_paper2_idle_experiments.sh 120` (idle-power baseline) — both use
+`monitor_power.sh`, included alongside them.
+
+> Targets the Kria KV260 under PetaLinux/Vitis AI; archived here for
+> provenance, not for building on a desktop.
+
+---

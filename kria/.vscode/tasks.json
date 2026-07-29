@@ -2,7 +2,7 @@
     "tasks": [
         {
             "type": "cppbuild",
-            "label": "USearch: Release (Optimizado)",
+            "label": "IsPlanktonBIO edge: Release (Optimizado)",
             "command": "/usr/bin/g++",
             "args": [
                 "-fdiagnostics-color=always",
@@ -47,7 +47,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "detail": "Máximo rendimiento para benchmark en Kria con USearch."
+            "detail": "Máximo rendimiento para Kria."
         }
     ],
     "version": "2.0.0"

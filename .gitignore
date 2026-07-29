@@ -8,5 +8,6 @@ __pycache__/
 *.pt
 *.bin
 *.sqlite
+*.xmodel
 
-output/
+output/metrics/

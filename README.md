@@ -67,20 +67,30 @@ pip install -r requirements.txt
 
 ## 📥 Pre-trained Models and Database Files
 
-Due to file size limits, the large model weights (`.pth`), FAISS indices (`.bin`), and SQLite databases (`.sqlite`) are hosted externally on **Zenodo** at the following DOI: [10.5281/zenodo.19162092](https://doi.org/10.5281/zenodo.19162092).
+Due to file size limits, the large model weights (`.pth`), FAISS indices (`.bin`), and SQLite databases (`.sqlite`) are hosted externally on **Zenodo** at the following DOI: [10.5281/zenodo.21676347](https://doi.org/10.5281/zenodo.21676347).
 
 Please download the following files from Zenodo and place them in their respective directories within the `data/` folder before running the pipeline:
 
 - **`data/models/weights/`**
   - `resnet50_stage1.pth`
   - `resnet50_stage2_opencv.pth`
-  - `sam2/sam2.1_hiera_large.pt` *(only needed for the optional SAM2 backend; see "Optional: SAM2 Segmentation Backend" below)*
 - **`data/databases/vector/`**
   - `faiss_index_stage1_pruned_089.bin`
   - `faiss_index_stage2_opencv_pruned_091.bin`
 - **`data/databases/sql/`**
   - `plankton_db_stage1_pruned_089.sqlite`
   - `plankton_db_stage2_opencv_pruned_091.sqlite`
+
+The files above cover Stage-1 and the default **`opencv`** Stage-2 backend. If you plan to run the optional **`sam2`** Stage-2 backend instead (see *"Optional: SAM2 Segmentation Backend"* below), also download:
+
+- **`data/models/weights/`**
+  - `resnet50_stage2_sam2.pth`
+- **`data/databases/vector/`**
+  - `faiss_index_stage2_pruned_093.bin`
+- **`data/databases/sql/`**
+  - `plankton_db_stage2_pruned_093.sqlite`
+
+> Note: the SAM2 *checkpoint* itself (`sam2.1_hiera_large.pt`) is **not** part of this Zenodo record — it is downloaded separately from Meta's official release, as described in the SAM2 section below.
 
 ---
 

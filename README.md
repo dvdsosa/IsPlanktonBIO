@@ -145,11 +145,18 @@ the default OpenCV backend.** To enable SAM2:
    > **Note:** The `--no-build-isolation` flag is required to bypass SAM2's 
    > package name mismatch issue during build.
 
-2. Download the checkpoint into `data/models/weights/sam2/`:
+2. Download the checkpoint used in this project — SAM2.1 **Hiera Large** — directly
+   from Meta's official SAM2 release (it is **not** part of this project's Zenodo
+   archive) and place it at `data/models/weights/sam2/sam2.1_hiera_large.pt`:
 
    ```bash
-   bash scripts/download_sam2.sh
+   mkdir -p data/models/weights/sam2
+   curl -L -o data/models/weights/sam2/sam2.1_hiera_large.pt \
+       https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt
    ```
+
+   (Other variants — tiny/small/base_plus — and the official download script are
+   listed at [facebookresearch/sam2](https://github.com/facebookresearch/sam2#getting-started).)
 
 3. Set the backend in your config:
 

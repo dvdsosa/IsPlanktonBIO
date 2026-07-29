@@ -5,5 +5,8 @@ __pycache__/
 *.py[cod]
 
 *.pth
+*.pt
 *.bin
 *.sqlite
+
+output/

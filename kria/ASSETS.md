@@ -25,4 +25,8 @@ them in this folder.
 `int8_backbone_stg1.xmodel` and `int8_backbone_stg2.xmodel` have no desktop
 equivalent (the PC pipeline uses `.pth`, not Vitis AI-compiled `.xmodel`).
 They are archived in this repo under `models/` and are also published on the
-project's Zenodo record: [10.5281/zenodo.19162092](https://doi.org/10.5281/zenodo.19162092).
+project's Zenodo record: [10.5281/zenodo.21676347](https://doi.org/10.5281/zenodo.21676347).
+
+---
+
+[⬅ Back to main README](../README.md)

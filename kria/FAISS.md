@@ -61,3 +61,7 @@ the [build task](.vscode/tasks.json) will succeed. Adapted from the board's own
 Once both are installed under `/usr/local`, the build task in
 [`.vscode/tasks.json`](.vscode/tasks.json) (which already points `-I`/`-L` at
 `/usr/local/include` and `/usr/local/lib64`/`/usr/local/lib`) will find them.
+
+---
+
+[⬅ Back to main README](../README.md)

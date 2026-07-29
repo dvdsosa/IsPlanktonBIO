@@ -1,0 +1,54 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "USearch: Release (Optimizado)",
+            "command": "/usr/bin/g++",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-std=c++17",
+                "-O3",
+                "-mcpu=cortex-a53",
+                "-Wl,--as-needed",
+                "-I.",
+                "-I/usr/local/include",
+                "-I/usr/include/opencv4",
+                "-I/usr/include/python3.10",
+                "-L/usr/local/lib64",
+                "-L/usr/local/lib",
+                "${file}",
+                "-o",
+                "${fileDirname}/bin/${fileBasenameNoExtension}",
+                "-lfaiss",
+                "-lturbojpeg",
+                "-lglog",
+                "-lopenblas",
+                "-lpython3.10",
+                "-lvitis_ai_library-classification",
+                "-lvitis_ai_library-dpu_task",
+                "-lvitis_ai_library-xnnpp",
+                "-lvitis_ai_library-model_config",
+                "-lvitis_ai_library-math",
+                "-lvart-util",
+                "-lvart-runner",
+                "-lxir",
+                "-pthread",
+                "-ljson-c",
+                "-lsqlite3",
+                "-lopencv_core",
+                "-lopencv_imgproc",
+                "-lopencv_imgcodecs",
+                "-lopencv_highgui"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Máximo rendimiento para benchmark en Kria con USearch."
+        }
+    ],
+    "version": "2.0.0"
+}

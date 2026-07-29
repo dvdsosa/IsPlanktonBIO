@@ -1,0 +1,44 @@
+paths:
+  dataset_root_path: '/dev/shm/test_dataset_ram'
+  faiss_index_stage_1: '/home/petalinux/vai_runtime/db/st1_p089.bin'
+  faiss_index_stage_2: '/home/petalinux/vai_runtime/db/st2_p091.bin'
+  sqlite_db_stage_1: '/home/petalinux/vai_runtime/db/st1_p089.sqlite'
+  sqlite_db_stage_2: '/home/petalinux/vai_runtime/db/st2_p091.sqlite'
+  ckpt_stage_1: '/home/petalinux/vai_runtime/models/int8_backbone_stg1.xmodel'
+  ckpt_stage_2: '/home/petalinux/vai_runtime/models/int8_backbone_stg2.xmodel'
+  areas_json: 'output/species_results_areas_paper2.json'
+  species_json: 'output/inference_results_paper2.json'
+  log_json_path: 'output/log_v3.json'
+
+model:
+  name: 'resnet50timm'
+
+# Insert here the mean and std for stage-1 and stage-2 
+# Watch out for the order of the channels, as it is BGR not RGB
+# Mean = value * 255
+# Std = 1 / (value * 255)
+transforms:
+  stage1:
+    mean: [10.4295, 9.0015, 10.659]
+    std: [0.05099569086, 0.0430468565, 0.04102059234]
+  stage2:
+    mean: [4.029, 4.7175, 4.9215]
+    std: [0.04707765459, 0.04018000643, 0.03811048229]
+
+# Pixel length for DYB-PlanktonNet is 7.38 μm. Area per pixel in mm^2 = (7.38 * 10^-3)^2
+pixel_to_mm2: 0.0000544644
+
+runtime:
+  json_flush_interval: 200
+  queue_limits:
+    q12_max: 20
+  stage2_enabled: true
+  trace_enabled: false
+  show_progress_bar: false
+  compute_metrics: false
+  # OOD gating DISABLED: cosine similarity lives in [-1, 1], so a negative
+  # threshold rejects no sample (nothing is ever flagged ood_sample_stage*).
+  cosine_threshold_stage_1: -1.0
+  cosine_threshold_stage_2: -1.0
+  # Exact FAISS search (Python parity). Set true only to trade accuracy for speed.
+  faiss_ivfpq: true

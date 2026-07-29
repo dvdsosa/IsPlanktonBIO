@@ -1,10 +1,10 @@
 # IsPlanktonBIO: A Two-Stage Pipeline for Plankton Taxonomy and Morphological Trait Extraction
 
-[![Journal](https://img.shields.io/badge/Journal-IEEE_JOURNAL_OF_OCEANIC_ENGINEERING-blue.svg)](https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=48)
+[![Journal](https://img.shields.io/badge/Journal-Results_in_Engineering-blue.svg)](https://www.sciencedirect.com/journal/results-in-engineering)
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: BSD 2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-yellow.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
-This repository contains the official codebase for the manuscript submitted to the ***IEEE JOURNAL OF OCEANIC ENGINEERING***. 
+This repository contains the official codebase for "When Simpler Segmentation Wins: Geometric Fidelity and Energy Efficiency in Edge Plankton Biometry," submitted to ***Results in Engineering*** (Elsevier).
 
 **IsPlanktonBIO** implements a comprehensive computer vision pipeline combining Supervised Contrastive Learning (SupCon) embeddings with classical image processing techniques. The execution is twofold:
 1. **Stage-1 (Taxonomy):** Integrates the [IsPlanktonIR](https://doi.org/10.1093/icesjms/fsac198) Information Retrieval system, utilizing a FAISS index for high-accuracy initial species classification.
@@ -51,7 +51,7 @@ Results are accumulated in memory and written once at the end of the run. The JS
 
 First, clone the repository to your local machine:
 ```bash
-git clone https://github.com/your-username/IsPlanktonBIO.git
+git clone https://github.com/dvdsosa/IsPlanktonBIO.git
 cd IsPlanktonBIO
 ```
 
@@ -91,7 +91,7 @@ Once the environment and the dataset are ready (see the *"Dataset Access"* secti
 **Load the test set into RAM first.** The embedded Kria target loads the dataset from a RAM-backed filesystem, so for a fair, apples-to-apples timing comparison we run the desktop pipeline the same way. Copy the test set into `/dev/shm` (tmpfs) — this matches the `dataset_root_path` in `configs/default_config.yaml`:
 
 ```bash
-cp -r /home/dsosatr/tesis/DYB-VOS/test /dev/shm/test_dataset_ram
+cp -r /home/dsosatr/tesis/DYB/test /dev/shm/test_dataset_ram
 ```
 
 Then run the pipeline:

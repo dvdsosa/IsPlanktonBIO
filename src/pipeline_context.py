@@ -27,6 +27,10 @@ class PipelineContext:
     # A very negative value (e.g. -9999.0) disables the gate (never rejects).
     cosine_threshold_stage1: float = field(default=-9999.0)
     cosine_threshold_stage2: float = field(default=-9999.0)
+    # Stage-2 segmentation backend (OpenCVSegmenter or SAM2Segmenter), selected
+    # by segmentation.method in the YAML config via segmenters.build_segmenter.
+    # Typed as Any to avoid importing the (optionally SAM2-dependent) module here.
+    segmenter: Any = field(default=None)
     # In-memory accumulator for inference results. Written once at the end of the
     # run via io_utils.dump_results_json; keyed by ground_truth class name.
     results_dict: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)

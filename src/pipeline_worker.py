@@ -47,9 +47,7 @@ from src.dataset import apply_additional_transforms_stage2, loader_with_paths
 from src.db_utils import get_label_from_db
 from src.image_utils import (
     crop_image_with_mask,
-    get_area_proxy_method,
     is_border_touch_acceptable,
-    preprocess_image,
 )
 from src.io_utils import accumulate_result, get_subtitles
 from src.logger_utils import (
@@ -175,6 +173,7 @@ def preprocess_worker(
     raw_queue: queue.Queue,
     preproc_queue: queue.Queue,
     transform_cfg: Optional[dict] = None,
+    segmenter=None,
 ) -> None:
     """
     T2: Consumes RawItems, performs CPU-bound image preprocessing, and feeds
@@ -190,6 +189,10 @@ def preprocess_worker(
         preproc_queue: Output queue consumed by T3 (maxsize=4).
         transform_cfg: Optional dict with stage-2 mean/std from config["transforms"].
             Passed straight through to apply_additional_transforms_stage2().
+        segmenter: Stage-2 segmentation backend (from segmenters.build_segmenter).
+            Segmentation runs entirely in this single T2 thread, so a stateful
+            backend such as SAM2 (whose predictor caches set_image state) is used
+            by exactly one thread and needs no extra locking.
     """
     try:
         while True:
@@ -198,7 +201,7 @@ def preprocess_worker(
                 break  # EOF received — propagate downstream and exit
 
             try:
-                _preprocess_one(item, preproc_queue, transform_cfg)
+                _preprocess_one(item, preproc_queue, transform_cfg, segmenter)
             except Exception:
                 logging.exception("[T2] Error preprocessing %s — skipping", item.path)
                 # Do NOT emit sentinel on per-item errors; keep the pipeline alive
@@ -212,6 +215,7 @@ def _preprocess_one(
     item: RawItem,
     preproc_queue: queue.Queue,
     transform_cfg: Optional[dict] = None,
+    segmenter=None,
 ) -> None:
     """Runs the CPU preprocessing pipeline for a single image and enqueues result."""
     # ------------------------------------------------------------------
@@ -225,11 +229,9 @@ def _preprocess_one(
     stage2_bgr: np.ndarray = (stage2_np * 255.0).clip(0, 255).astype(np.uint8)
 
     # ------------------------------------------------------------------
-    # OpenCV preprocessing: grayscale → brightness/contrast → Otsu
-    # → morphological ops → contour detection
+    # Stage-2 segmentation via the configured backend (OpenCV or SAM2).
     # ------------------------------------------------------------------
-    preprocessed_image = preprocess_image(stage2_bgr)
-    success, mask_area, mask_contour = get_area_proxy_method(stage2_bgr, preprocessed_image)
+    success, mask_area, mask_contour = segmenter.segment(stage2_bgr)
 
     acceptable_segmentation = False
     cropped_tensor: Optional[torch.Tensor] = None
@@ -255,7 +257,9 @@ def _preprocess_one(
             ground_truth=item.ground_truth,
             path=item.path,
             stage2_bgr=stage2_bgr,
-            preprocessed_image=preprocessed_image,
+            # No longer produced here: the binary silhouette now lives inside the
+            # segmentation backend and is not consumed downstream (T3/T4).
+            preprocessed_image=None,
             success=success,
             mask_area=mask_area if mask_area is not None else 0.0,
             mask_contour=mask_contour,

@@ -3,6 +3,7 @@
 [![Journal](https://img.shields.io/badge/Journal-Results_in_Engineering-blue.svg)](https://www.sciencedirect.com/journal/results-in-engineering)
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD 2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-yellow.svg)](https://opensource.org/licenses/BSD-2-Clause)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23454367.svg)](https://doi.org/10.5281/zenodo.23454367)
 
 This repository contains the official codebase for "When Simpler Segmentation Measures Up: Geometric Fidelity and Energy Efficiency in Edge Plankton Biometry," submitted to ***Results in Engineering*** (Elsevier).
 
@@ -216,7 +217,7 @@ A copy of the printed report is also written to `tests/output/<method>_acc.txt` 
 
 The paper measures segmentation accuracy against manual outlines of 120 test images (Section 4.3, Table 7). The
 outlines, 15 repeated outlines for intra-annotator repeatability, the per-image metrics and the scripts that
-reproduce Table 7 are in [`data/manual_reference/`](data/manual_reference/README.md). The outlines are polygon
+reproduce Table 7 are in [`data/manual_reference/`](data/manual_reference/README.md). They were drawn with [MorphoTrace](https://dvdsosa.github.io/morphotrace/) ([doi:10.5281/zenodo.23454366](https://doi.org/10.5281/zenodo.23454366)). The outlines are polygon
 coordinates keyed to the original DYB-PlanktonNet file names; the images are not redistributed.
 
 ---
@@ -375,3 +376,7 @@ For the paper's benchmark table (mean ± std over 10 runs):
 > provenance, not for building on a desktop.
 
 ---
+
+## Citation
+
+Source code and manual reference outlines: Zenodo, [doi:10.5281/zenodo.23454367](https://doi.org/10.5281/zenodo.23454367) (all versions; v1.0.0: [doi:10.5281/zenodo.23454368](https://doi.org/10.5281/zenodo.23454368)). Pre-trained weights and reference databases: [doi:10.5281/zenodo.21676347](https://doi.org/10.5281/zenodo.21676347).

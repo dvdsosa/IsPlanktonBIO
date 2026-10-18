@@ -35,7 +35,8 @@ Other-zooplankton specimens drawn with a second fixed seed.
 
 ## Annotation protocol
 
-One author outlined every organism with [MorphoTrace](https://github.com/dvdsosa/morphotrace) v0.2.5, blind to the
+One author outlined every organism with [MorphoTrace](https://github.com/dvdsosa/morphotrace) v0.2.5 (tag `v0.2.5`;
+run it online at https://dvdsosa.github.io/morphotrace/; Zenodo [doi:10.5281/zenodo.23454366](https://doi.org/10.5281/zenodo.23454366)), blind to the
 pipeline masks.
 
 - Each outline encloses the whole visible silhouette, including antennae and appendages but excluding setae thinner

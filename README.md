@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: BSD 2-Clause](https://img.shields.io/badge/License-BSD_2--Clause-yellow.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
-This repository contains the official codebase for "When Simpler Segmentation Wins: Geometric Fidelity and Energy Efficiency in Edge Plankton Biometry," submitted to ***Results in Engineering*** (Elsevier).
+This repository contains the official codebase for "When Simpler Segmentation Measures Up: Geometric Fidelity and Energy Efficiency in Edge Plankton Biometry," submitted to ***Results in Engineering*** (Elsevier).
 
 **IsPlanktonBIO** implements a comprehensive computer vision pipeline combining Supervised Contrastive Learning (SupCon) embeddings with classical image processing techniques. The execution is twofold:
 1. **Stage-1 (Taxonomy):** Integrates the [IsPlanktonIR](https://doi.org/10.1093/icesjms/fsac198) Information Retrieval system, utilizing a FAISS index for high-accuracy initial species classification.
@@ -209,6 +209,15 @@ This script reads the true labels and both stage predictions from the JSON file 
 - **Stage Metrics** — the raw classifier accuracy of each backbone, without OOD gating.
 
 A copy of the printed report is also written to `tests/output/<method>_acc.txt` (the path is auto-derived from the JSON filename, or set explicitly with `--output`).
+
+---
+
+## 📐 Manual Reference Outlines (Segmentation Accuracy)
+
+The paper measures segmentation accuracy against manual outlines of 120 test images (Section 4.3, Table 7). The
+outlines, 15 repeated outlines for intra-annotator repeatability, the per-image metrics and the scripts that
+reproduce Table 7 are in [`data/manual_reference/`](data/manual_reference/README.md). The outlines are polygon
+coordinates keyed to the original DYB-PlanktonNet file names; the images are not redistributed.
 
 ---
 

@@ -95,6 +95,7 @@ are the exact files used in the paper:
 | `repeatability.csv` | Second against first outline for the 15 repeated images |
 | `iou_by_group.csv`, `group_areas.csv` | Mean IoU and mean areas per functional group |
 | `deterministic_areas.csv` | Reported area and mask pixel count of the deterministic pipeline |
+| `edge_per_image_metrics.csv`, `edge_summary.csv` | Deterministic masks of the deployed KV260 against the outlines (see below) |
 
 Regenerated masks match the paper's exactly for the deterministic pipeline and for the mesh-point, five-point and largest-mask variants. A few box and interior-point masks can differ between runs because SAM 2 runs in bfloat16 on the GPU, which is not bit-reproducible (16 of 836 masks in our check, on an RTX 3060); the effect on Table 7 is at most 0.002 in mean IoU and 0.3 points in median area error.
 
@@ -102,6 +103,26 @@ Mask variants written by `make_masks.py`: `deterministic`; SAM 2 with the paper'
 bounding box (`box`), box plus the deepest interior point (`box_center`), deepest interior point (`center_point`),
 five evenly spaced mesh points (`mesh5_points`), and the paper's mesh points keeping the largest of the three
 candidate masks (`paper_mesh_largest`). All prompts derive from the shared preprocessing contour.
+
+## Deployed KV260 masks
+
+The paper's PC pipeline and the deployed KV260 application segment the same way but read the images differently.
+On the PC, the data loader delivers RGB images to a grayscale conversion written for OpenCV's BGR order, so the red
+and blue weights are swapped; the KV260 decodes JPEGs in BGR order (TurboJPEG) and applies the standard weights.
+Table 2 of the paper therefore also scores the deterministic masks of the KV260 against the outlines (row
+Determ./Edge): mean IoU 0.79 and median absolute area error 12.5%, against 0.79 and 11.2% on the PC.
+
+```bash
+# 1) On the PC: port of the KV260 segment_and_crop() applied to the images in BGR order
+python data/manual_reference/scripts/edge_masks.py --dataset /path/to/DYB-PlanktonNet
+# 2) Optional, on the KV260: the deployed code itself (kria/tools/edge_mask_dump.cpp, build line in its header)
+./edge_mask_dump list.txt out          # list.txt: the 120 image paths of manifest.csv
+python data/manual_reference/scripts/edge_masks.py --dataset /path/to/DYB-PlanktonNet --kria-masks out
+```
+
+`edge_masks.py` also feeds the same port the images in RGB order and checks that it reproduces the PC masks of
+`make_masks.py` (`--masks`, default `masks/`). In our run both checks hold for all 120 images: the RGB control
+matches the PC masks and the KV260 masks match the BGR port, pixel for pixel.
 
 ## License
 
